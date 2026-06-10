@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Aprovação de Pagamentos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f2efe9;--card:#faf8f4;--dark:#1c1c1a;--muted:#8a8880;--border:#e4e0d8;--gl:#eaf5d8;--g:#5a9e1a;--gb:#8ac840;--rl:#fdeaea;--r:#c03030;--rb:#e06060;--wa:#25D366}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;background:var(--bg);color:var(--dark);min-height:100vh;-webkit-text-size-adjust:100%}
+
+/* ── UPLOAD SCREEN ── */
+#uploadScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.logo{font-size:30px;font-weight:800;letter-spacing:-.03em;margin-bottom:4px}
+.logo span{color:var(--g)}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:36px;text-align:center}
+.drop-zone{width:100%;max-width:400px;border:2px dashed var(--border);border-radius:16px;padding:44px 24px;text-align:center;cursor:pointer;transition:all .2s;background:var(--card)}
+.drop-zone:hover,.drop-zone.over{border-color:var(--g);background:#f0fbe6}
+.drop-icon{font-size:44px;margin-bottom:12px}
+.drop-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.drop-sub{font-size:13px;color:var(--muted)}
+#fileInput{display:none}
+.wa-config{width:100%;max-width:400px;margin-top:16px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px}
+.wa-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
+.wa-input{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;background:var(--bg);color:var(--dark);outline:none}
+.wa-input:focus{border-color:var(--g)}
+.err{color:var(--r);font-size:13px;margin-top:10px;display:none;text-align:center}
+
+/* ── APPROVAL SCREEN ── */
+#approvalScreen{display:none;flex-direction:column;min-height:100vh;padding-bottom:110px}
+.header{background:var(--dark);color:#f2efe9;padding:20px 16px 16px}
+.hl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.ht{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.topbar{display:flex;gap:8px;padding:12px 16px;background:var(--bg);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+.topbar button{flex:1;padding:11px 12px;border-radius:10px;border:none;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.ba{background:var(--dark);color:#f2efe9}
+.bc{background:transparent;color:var(--muted);border:1px solid var(--border)!important}
+.list{padding:12px 16px 0;display:flex;flex-direction:column;gap:8px}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 14px 10px;transition:background .18s,border-color .18s}
+.card.ok{background:var(--gl);border-color:var(--gb)}
+.card.nao{background:var(--rl);border-color:var(--rb);opacity:.82}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px}
+.nome{font-size:13px;font-weight:700;line-height:1.35;flex:1}
+.parc-inline{font-size:10px;font-weight:700;background:var(--dark);color:#f2efe9;border-radius:20px;padding:2px 8px;white-space:nowrap;margin-left:6px;vertical-align:middle}
+.valor{font-size:13px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.card-mid{margin-bottom:10px}
+.obs{font-size:11.5px;color:var(--muted);line-height:1.4}
+.btns{display:flex;gap:8px}
+.btns button{flex:1;padding:10px 8px;border-radius:9px;border:none;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.b-ok{background:var(--gl);color:var(--g)}
+.b-nao{background:var(--rl);color:var(--r)}
+.card.ok .b-ok{background:var(--g);color:#fff}
+.card.nao .b-nao{background:var(--r);color:#fff}
+.divider{height:1px;background:var(--border);margin:14px 16px 0}
+.totais{margin:8px 16px 0;background:var(--dark);border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
+.tl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.tv{font-size:17px;font-weight:700;color:#f2efe9;font-variant-numeric:tabular-nums}
+.footer{position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--border);padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+.btn-wa{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--wa);color:#fff;text-decoration:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;font-family:inherit;border:none;cursor:pointer;touch-action:manipulation}
+.btn-wa:active{opacity:.88}
+.stxt{text-align:center;font-size:11.5px;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+
+<!-- ── TELA DE UPLOAD ── -->
+<div id="uploadScreen">
+  <div class="logo">Aprovação<span>.</span></div>
+  <p class="subtitle">Suba o arquivo do dia e aprove os pagamentos</p>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">📊</div>
+    <div class="drop-title">Arraste o arquivo .XLS aqui</div>
+    <div class="drop-sub">ou toque para selecionar</div>
+    <input type="file" id="fileInput" accept=".xls,.xlsx">
+  </div>
+
+  <div class="wa-config">
+    <div class="wa-label">Número WhatsApp (com DDI+DDD)</div>
+    <input class="wa-input" type="tel" id="waNumber" value="5519981262033">
+  </div>
+
+  <p class="err" id="errMsg">⚠️ Não foi possível ler o arquivo. Verifique o formato.</p>
+</div>
+
+<!-- ── TELA DE APROVAÇÃO ── -->
+<div id="approvalScreen">
+  <div class="header">
+    <p class="hl">Pagamentos do dia</p>
+    <h1 class="ht" id="dateTitle"></h1>
+  </div>
+  <div class="topbar">
+    <button class="ba" id="btnAll">✔ Aprovar todos</button>
+    <button class="bc" id="btnClr">Limpar</button>
+    <button class="bc" id="btnVoltar">↩</button>
+  </div>
+  <div class="list" id="cardList"></div>
+  <div class="divider"></div>
+  <div class="totais">
+    <span class="tl">Total geral</span>
+    <span class="tv" id="totalVal"></span>
+  </div>
+  <div class="footer">
+    <button class="btn-wa" id="btnWA">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      Enviar pelo WhatsApp
+    </button>
+    <p class="stxt" id="stxt">Nenhum item avaliado ainda</p>
+  </div>
+</div>
+
+<script>
+var DADOS = [];
+var E = {};
+var TOTAL = 0;
+var DATE_LABEL = '';
+var MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+// ── UPLOAD ──
+var dropZone = document.getElementById('dropZone');
+var fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', function(){ fileInput.click(); });
+dropZone.addEventListener('dragover', function(e){ e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', function(){ dropZone.classList.remove('over'); });
+dropZone.addEventListener('drop', function(e){ e.preventDefault(); dropZone.classList.remove('over'); if(e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', function(){ if(this.files[0]) processFile(this.files[0]); });
+
+function processFile(file) {
+  document.getElementById('errMsg').style.display = 'none';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = new Uint8Array(e.target.result);
+      var wb = XLSX.read(data, {type:'array', cellDates:true});
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      parseRows(rows, file.name);
+    } catch(err) {
+      document.getElementById('errMsg').style.display = 'block';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseRows(rows, filename) {
+  var colF=-1, colO=-1, colP=-1, colV=-1, colD=-1, header=null;
+  for(var i=0;i<Math.min(rows.length,5);i++){
+    var row=rows[i];
+    for(var j=0;j<row.length;j++){
+      var c=String(row[j]).toLowerCase().trim();
+      if(c.includes('fornecedor')) colF=j;
+      if(c.includes('observa')) colO=j;
+      if(c.includes('parcela')) colP=j;
+      if(c.includes('valor')) colV=j;
+      if(c.includes('vencto')||c.includes('vencimento')||c.includes('data')) colD=j;
+    }
+    if(colF>=0&&colV>=0){header=i;break;}
+  }
+  if(header===null){document.getElementById('errMsg').style.display='block';return;}
+
+  DADOS=[];E={};TOTAL=0;
+  var dateFound=null;
+
+  for(var i=header+1;i<rows.length;i++){
+    var row=rows[i];
+    var forn=colF>=0?String(row[colF]||'').trim():'';
+    var obs=colO>=0?String(row[colO]||'').trim():'';
+    var parc=colP>=0?String(row[colP]||'').trim():'1/1';
+    var val=colV>=0?row[colV]:0;
+    var dc=colD>=0?row[colD]:'';
+
+    if(!forn||forn===''||forn.toLowerCase()==='nan') continue;
+    if(!dateFound&&dc){var d=parseDate(dc);if(d)dateFound=d;}
+    if(forn.toLowerCase().includes('total')||String(obs).toLowerCase().includes('total geral')){
+      if(typeof val==='number'&&val>0)TOTAL=val;
+      continue;
+    }
+    var vn=typeof val==='number'?val:parseFloat(String(val).replace(/[^\d,\.]/g,'').replace(',','.'))||0;
+    if(vn<=0) continue;
+    DADOS.push({f:forn, o:(obs==='nan'?'':obs), p:(parc===''||parc==='nan'?'1/1':parc), v:vn});
+  }
+
+  if(DADOS.length===0){document.getElementById('errMsg').style.display='block';return;}
+  if(TOTAL===0) DADOS.forEach(function(r){TOTAL+=r.v;});
+  if(!dateFound) dateFound=dateFromFilename(filename);
+  DATE_LABEL = dateFound ? formatLabel(dateFound) : 'Pagamentos do dia';
+
+  buildApproval();
+}
+
+function buildApproval(){
+  document.getElementById('dateTitle').textContent = DATE_LABEL;
+  document.getElementById('totalVal').textContent = fBRL(TOTAL);
+  E={};
+
+  var list=document.getElementById('cardList');
+  list.innerHTML='';
+  DADOS.forEach(function(r,i){
+    var div=document.createElement('div');
+    div.className='card';
+    div.id='c'+i;
+    div.innerHTML=
+      '<div class="card-top"><span class="nome">'+esc(r.f)+' <span class="parc-inline">'+esc(r.p)+'</span></span>'
+      +'<span class="valor">'+fBRL(r.v)+'</span></div>'
+      +'<div class="card-mid"><span class="obs">'+esc(r.o)+'</span></div>'
+      +'<div class="btns">'
+      +'<button class="b-ok" data-id="'+i+'" data-val="ok">✔ Aprovar</button>'
+      +'<button class="b-nao" data-id="'+i+'" data-val="nao">✘ Reprovar</button>'
+      +'</div>';
+    list.appendChild(div);
+  });
+
+  // Bind botões dos cards
+  document.querySelectorAll('.btns button').forEach(function(btn){
+    btn.addEventListener('touchend',function(e){e.preventDefault();marcar(this);});
+    btn.addEventListener('click',function(){marcar(this);});
+  });
+
+  atualizar();
+  document.getElementById('uploadScreen').style.display='none';
+  var as=document.getElementById('approvalScreen');
+  as.style.display='flex';
+  as.style.flexDirection='column';
+  window.scrollTo(0,0);
+}
+
+// ── AÇÕES ──
+document.getElementById('btnAll').addEventListener('click', function(){
+  DADOS.forEach(function(_,i){E[i]='ok';document.getElementById('c'+i).className='card ok';});
+  atualizar();
+});
+document.getElementById('btnClr').addEventListener('click', function(){
+  DADOS.forEach(function(_,i){delete E[i];document.getElementById('c'+i).className='card';});
+  atualizar();
+});
+document.getElementById('btnVoltar').addEventListener('click', function(){
+  document.getElementById('approvalScreen').style.display='none';
+  document.getElementById('uploadScreen').style.display='flex';
+  document.getElementById('fileInput').value='';
+});
+document.getElementById('btnWA').addEventListener('click', abrirWA);
+
+function marcar(btn){
+  var id=parseInt(btn.getAttribute('data-id'));
+  var val=btn.getAttribute('data-val');
+  var card=document.getElementById('c'+id);
+  if(E[id]===val){delete E[id];card.className='card';}
+  else{E[id]=val;card.className='card '+val;}
+  atualizar();
+}
+
+function atualizar(){
+  var ok=0,nao=0;
+  Object.values(E).forEach(function(v){if(v==='ok')ok++;else nao++;});
+  var pend=DADOS.length-ok-nao;
+  document.getElementById('stxt').textContent=
+    (ok+nao===0)?'Nenhum item avaliado ainda':
+    ok+' aprovado(s) · '+nao+' reprovado(s) · '+pend+' pendente(s)';
+}
+
+function abrirWA(){
+  var num=document.getElementById('waNumber').value.trim()||'5519981262033';
+  var ok=[],nao=[],pend=[];
+  DADOS.forEach(function(d,i){
+    var l=d.f+' ('+d.p+') — '+fBRL(d.v);
+    if(E[i]==='ok') ok.push('✅ '+l);
+    else if(E[i]==='nao') nao.push('❌ '+l);
+    else pend.push('⏳ '+l);
+  });
+  var msg='*APROVAÇÃO DE PAGAMENTOS — '+DATE_LABEL+'*\n';
+  msg+='━━━━━━━━━━━━━━━━━━━━\n\n';
+  if(ok.length)   msg+='*✅ APROVADOS ('+ok.length+')*\n'+ok.join('\n')+'\n\n';
+  if(nao.length)  msg+='*❌ REPROVADOS ('+nao.length+')*\n'+nao.join('\n')+'\n\n';
+  if(pend.length) msg+='*⏳ PENDENTES ('+pend.length+')*\n'+pend.join('\n')+'\n\n';
+  msg+='━━━━━━━━━━━━━━━━━━━━\n';
+  msg+='*Total geral: '+fBRL(TOTAL)+'*';
+  window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msg),'_blank');
+}
+
+// ── HELPERS ──
+function parseDate(v){
+  if(!v) return null;
+  if(v instanceof Date && !isNaN(v.getTime())) return v;
+  if(typeof v==='number' && v>1){var d=new Date(Math.round((v-25569)*86400*1000));if(!isNaN(d.getTime()))return d;}
+  var s=String(v);
+  var m=s.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
+  m=s.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if(m) return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));
+  return null;
+}
+function dateFromFilename(n){
+  var m=n.match(/(\d{2})[_\-](\d{2})/);
+  if(m) return new Date(new Date().getFullYear(),parseInt(m[2])-1,parseInt(m[1]));
+  return null;
+}
+function formatLabel(d){
+  return String(d.getDate()).padStart(2,'0')+' de '+MESES[d.getMonth()]+' de '+d.getFullYear();
+}
+function fBRL(v){
+  return 'R$\u00a0'+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function esc(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
